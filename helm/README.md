@@ -104,6 +104,20 @@ env:
   OPENSEARCH_PASSWORD: "<os-pass>"
 ```
 
+## User Registration
+
+Control user registration via `env.REGISTER_ENABLED`:
+
+```yaml
+env:
+  REGISTER_ENABLED: "1"   # "1" (default): Enable registration, "0": Disable
+  # You can also use boolean values (true/false), which will be converted to "1"/"0"
+  # REGISTER_ENABLED: false  # Disables registration
+```
+
+- `"1"` or `true`: Enable user registration (default)
+- `"0"` or `false`: Disable user registration
+
 ## Ingress
 
 Expose the web UI via Ingress:

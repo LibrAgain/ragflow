@@ -74,6 +74,12 @@ env:
   # The number of text chunks processed in a single batch during embedding vectorization.
   EMBEDDING_BATCH_SIZE: 16
 
+  # Enable or disable user registration.
+  # "1" (default): Enable user registration.
+  # "0": Disable user registration.
+  # You can also use true/false (will be converted to "1"/"0").
+  REGISTER_ENABLED: "1"
+
 ragflow:
   image:
     repository: infiniflow/ragflow
