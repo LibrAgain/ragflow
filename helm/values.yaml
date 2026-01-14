@@ -258,6 +258,15 @@ ingress:
       paths:
         - path: /
           pathType: ImplementationSpecific
+        # Example: Route /api/v1 to the ragflow-api service
+        # Use "api" as service name - it will be automatically converted to "{{ .Release.Name }}-api"
+        # - path: /api/v1
+        #   pathType: Prefix
+        #   backend:
+        #     service:
+        #       name: api
+        #       port:
+        #         name: http-api
   tls: []
   #  - secretName: chart-example-tls
   #    hosts:

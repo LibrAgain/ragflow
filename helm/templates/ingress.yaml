@@ -29,15 +29,45 @@ spec:
       http:
         paths:
           {{- range .paths }}
+          {{- $apiServiceName := printf "%s-api" $.Release.Name }}
+          {{- $serviceName := "" }}
+          {{- $usePortName := true }}
+          {{- $portValue := "http" }}
+          {{- if and .backend .backend.service }}
+          {{- if eq .backend.service.name "api" }}
+          {{- $serviceName = $apiServiceName }}
+          {{- else }}
+          {{- $serviceName = .backend.service.name }}
+          {{- end }}
+          {{- if and (eq $serviceName $apiServiceName) (not $.Values.ragflow.api.service.enabled) }}
+          {{- fail (printf "Path %s routes to ragflow-api service, but ragflow.api.service.enabled is false. Please enable it in values.yaml" .path) }}
+          {{- end }}
+          {{- if .backend.service.port.name }}
+          {{- $portValue = .backend.service.port.name }}
+          {{- $usePortName = true }}
+          {{- else if .backend.service.port.number }}
+          {{- $portValue = .backend.service.port.number }}
+          {{- $usePortName = false }}
+          {{- else if .backend.service.port }}
+          {{- $portValue = .backend.service.port }}
+          {{- $usePortName = true }}
+          {{- end }}
+          {{- else }}
+          {{- $serviceName = (include "ragflow.fullname" $) }}
+          {{- end }}
           - path: {{ .path }}
             {{- with .pathType }}
             pathType: {{ . }}
             {{- end }}
             backend:
               service:
-                name: {{ include "ragflow.fullname" $ }}
+                name: {{ $serviceName | quote }}
                 port:
-                  name: http
+                  {{- if $usePortName }}
+                  name: {{ $portValue }}
+                  {{- else }}
+                  number: {{ $portValue }}
+                  {{- end }}
           {{- end }}
     {{- end }}
 {{- end }}
