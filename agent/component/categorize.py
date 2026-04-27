@@ -21,6 +21,7 @@ from abc import ABC
 
 from common.constants import LLMType
 from api.db.services.llm_service import LLMBundle
+from api.db.joint_services.tenant_model_service import get_model_config_by_type_and_name
 from agent.component.llm import LLMParam, LLM
 from common.connection_utils import timeout
 from rag.llm.chat_model import ERROR_PREFIX
@@ -122,7 +123,8 @@ class Categorize(LLM, ABC):
         msg[-1]["content"] = query_value
         self.set_input_value(query_key, msg[-1]["content"])
         self._param.update_prompt()
-        chat_mdl = LLMBundle(self._canvas.get_tenant_id(), LLMType.CHAT, self._param.llm_id)
+        chat_model_config = get_model_config_by_type_and_name(self._canvas.get_tenant_id(), LLMType.CHAT, self._param.llm_id)
+        chat_mdl = LLMBundle(self._canvas.get_tenant_id(), chat_model_config)
 
         user_prompt = """
 ---- Real Data ----
@@ -147,7 +149,7 @@ class Categorize(LLM, ABC):
             category_counts[c] = count
 
         cpn_ids = list(self._param.category_description.items())[-1][1]["to"]
-        max_category = list(self._param.category_description.keys())[0]
+        max_category = list(self._param.category_description.keys())[-1]
         if any(category_counts.values()):
             max_category = max(category_counts.items(), key=lambda x: x[1])[0]
             cpn_ids = self._param.category_description[max_category]["to"]

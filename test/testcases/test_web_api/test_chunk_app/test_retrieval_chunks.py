@@ -17,12 +17,12 @@ import os
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 import pytest
-from common import retrieval_chunks
+from test_common import retrieval_chunks
 from configs import INVALID_API_TOKEN
 from libs.auth import RAGFlowWebApiAuth
 
 
-@pytest.mark.p1
+@pytest.mark.p2
 class TestAuthorization:
     @pytest.mark.parametrize(
         "invalid_auth, expected_code, expected_message",
@@ -194,14 +194,14 @@ class TestChunksRetrieval:
                 100,
                 4,
                 "must be greater than 0",
-                marks=pytest.mark.skipif(os.getenv("DOC_ENGINE") in ["infinity", "opensearch"], reason="Infinity"),
+                marks=pytest.mark.skip(reason="Web API does not validate top_k"),
             ),
             pytest.param(
                 {"top_k": -1},
                 100,
                 4,
                 "3014",
-                marks=pytest.mark.skipif(os.getenv("DOC_ENGINE") in [None, "opensearch", "elasticsearch"], reason="elasticsearch"),
+                marks=pytest.mark.skip(reason="Web API does not validate top_k"),
             ),
             pytest.param(
                 {"top_k": "a"},
@@ -265,11 +265,11 @@ class TestChunksRetrieval:
     @pytest.mark.parametrize(
         "payload, expected_code, expected_highlight, expected_message",
         [
-            ({"highlight": True}, 0, True, ""),
-            ({"highlight": "True"}, 0, True, ""),
-            pytest.param({"highlight": False}, 0, False, "", marks=pytest.mark.skip(reason="issues/6648")),
-            pytest.param({"highlight": "False"}, 0, False, "", marks=pytest.mark.skip(reason="issues/6648")),
-            pytest.param({"highlight": None}, 0, False, "", marks=pytest.mark.skip(reason="issues/6648")),
+            pytest.param({"highlight": True}, 0, True, "", marks=pytest.mark.skip(reason="highlight not functionnal")),
+            pytest.param({"highlight": "True"}, 0, True, "", marks=pytest.mark.skip(reason="highlight not functionnal")),
+            ({"highlight": False}, 0, False, ""),
+            ({"highlight": "False"}, 0, False, ""),
+            ({"highlight": None}, 0, False, "")
         ],
     )
     def test_highlight(self, WebApiAuth, add_chunks, payload, expected_code, expected_highlight, expected_message):

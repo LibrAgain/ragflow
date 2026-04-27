@@ -1,5 +1,6 @@
 import {
   DynamicForm,
+  DynamicFormRef,
   FormFieldConfig,
   FormFieldType,
 } from '@/components/dynamic-form';
@@ -9,9 +10,11 @@ import { useCommonTranslation, useTranslate } from '@/hooks/common-hooks';
 import { useBuildModelTypeOptions } from '@/hooks/logic-hooks/use-build-options';
 import { IModalProps } from '@/interfaces/common';
 import { IAddLlmRequestBody } from '@/interfaces/request/llm';
-import { useMemo } from 'react';
+import { VerifyResult } from '@/pages/user-setting/setting-model/hooks';
+import { memo, useCallback, useMemo, useRef } from 'react';
 import { FieldValues } from 'react-hook-form';
 import { LLMHeader } from '../../components/llm-header';
+import VerifyButton from '../../modal/verify-button';
 
 const llmFactoryToUrlMap: Partial<Record<LLMFactory, string>> = {
   [LLMFactory.Ollama]:
@@ -24,6 +27,7 @@ const llmFactoryToUrlMap: Partial<Record<LLMFactory, string>> = {
   [LLMFactory.LMStudio]: 'https://lmstudio.ai/docs/basics',
   [LLMFactory.OpenAiAPICompatible]:
     'https://platform.openai.com/docs/models/gpt-4',
+  [LLMFactory.RAGcon]: 'https://www.ragcon.ai/erste-schritte-mit-ragflow/',
   [LLMFactory.TogetherAI]: 'https://docs.together.ai/docs/deployment-options',
   [LLMFactory.Replicate]: 'https://replicate.com/docs/topics/deployments',
   [LLMFactory.OpenRouter]: 'https://openrouter.ai/docs',
@@ -38,6 +42,7 @@ const OllamaModal = ({
   visible,
   hideModal,
   onOk,
+  onVerify,
   loading,
   llmFactory,
   editMode = false,
@@ -45,10 +50,14 @@ const OllamaModal = ({
 }: IModalProps<Partial<IAddLlmRequestBody> & { provider_order?: string }> & {
   llmFactory: string;
   editMode?: boolean;
+  onVerify?: (
+    postBody: any,
+  ) => Promise<boolean | void | VerifyResult | undefined>;
 }) => {
   const { t } = useTranslate('setting');
   const { t: tc } = useCommonTranslation();
   const { buildModelTypeOptions } = useBuildModelTypeOptions();
+  const formRef = useRef<DynamicFormRef>(null);
 
   const optionsMap: Partial<
     Record<LLMFactory, { label: string; value: string }[]>
@@ -66,6 +75,14 @@ const OllamaModal = ({
       'image2text',
     ]),
     [LLMFactory.Xinference]: buildModelTypeOptions([
+      'chat',
+      'embedding',
+      'rerank',
+      'image2text',
+      'speech2text',
+      'tts',
+    ]),
+    [LLMFactory.RAGcon]: buildModelTypeOptions([
       'chat',
       'embedding',
       'rerank',
@@ -233,6 +250,27 @@ const OllamaModal = ({
     await onOk?.(data);
   };
 
+  const verifyParamsFunc = useCallback(() => {
+    const values = formRef.current?.getValues();
+    const modelType =
+      values.model_type === 'chat' && values.vision
+        ? 'image2text'
+        : values.model_type;
+    return {
+      llm_factory: llmFactory,
+      model_type: modelType,
+    };
+  }, [llmFactory]);
+
+  const handleVerify = useCallback(
+    async (params: any) => {
+      const verifyParams = verifyParamsFunc();
+      const res = await onVerify?.({ ...params, ...verifyParams });
+      return (res || { isValid: null, logs: '' }) as VerifyResult;
+    },
+    [verifyParamsFunc, onVerify],
+  );
+
   return (
     <Modal
       title={<LLMHeader name={llmFactory} />}
@@ -245,10 +283,14 @@ const OllamaModal = ({
       <DynamicForm.Root
         key={`${visible}-${llmFactory}`}
         fields={fields}
+        ref={formRef}
         onSubmit={() => {}}
         defaultValues={defaultValues}
         labelClassName="font-normal"
       >
+        {onVerify && (
+          <VerifyButton onVerify={handleVerify} isAbsolute={false} />
+        )}
         <div className="flex items-center justify-between w-full gap-2 ">
           <a href={url} target="_blank" rel="noreferrer" className="text-sm">
             {t('ollamaLink', { name: llmFactory })}
@@ -273,4 +315,4 @@ const OllamaModal = ({
   );
 };
 
-export default OllamaModal;
+export default memo(OllamaModal);
