@@ -133,6 +133,10 @@ infinity:
     tag: v0.7.0
     pullPolicy: IfNotPresent
     pullSecrets: []
+  # Full content of infinity_conf.toml. When set, it is mounted at
+  # /infinity_conf.toml and infinity is started with `-f /infinity_conf.toml`.
+  # When empty (default), infinity runs with its built-in defaults.
+  customConfig: ""
   storage:
     className:
     capacity: 5Gi
