@@ -19,17 +19,33 @@ package tokenizer
 import (
 	"context"
 	"fmt"
-	"ragflow/internal/engine"
+	"os"
+	"ragflow/internal/common"
 	"runtime"
 	"sync"
 	"sync/atomic"
 	"time"
+	"unicode/utf8"
 
+	"github.com/pkoukk/tiktoken-go"
 	"go.uber.org/zap"
 
 	rag "ragflow/internal/binding"
-	"ragflow/internal/logger"
 )
+
+// engineTypeProvider is injected at startup by engine.RegisterEngineType
+// to break the tokenizer → engine import cycle.
+var engineTypeProvider = func() string { return "" }
+
+// RegisterEngineType wires the engine package's GetEngineType into the
+// tokenizer, breaking the circular import (engine/elasticsearch → tokenizer → engine).
+func RegisterEngineType(get func() string) {
+	if get == nil {
+		engineTypeProvider = func() string { return "" }
+		return
+	}
+	engineTypeProvider = get
+}
 
 // PoolConfig configures the elastic analyzer pool
 type PoolConfig struct {
@@ -80,7 +96,11 @@ func Init(cfg *PoolConfig) error {
 
 		// Set default values
 		if cfg.DictPath == "" {
-			cfg.DictPath = "/usr/share/infinity/resource"
+			if env := os.Getenv("RAGFLOW_DICT_PATH"); env != "" {
+				cfg.DictPath = env
+			} else {
+				cfg.DictPath = "/usr/share/infinity/resource"
+			}
 		}
 		if cfg.MinSize <= 0 {
 			cfg.MinSize = runtime.NumCPU() * 2
@@ -98,7 +118,7 @@ func Init(cfg *PoolConfig) error {
 			cfg.AcquireTimeout = 10 * time.Second
 		}
 
-		logger.Info("Initializing analyzer pool",
+		common.Info("Initializing analyzer pool",
 			zap.String("dict_path", cfg.DictPath),
 			zap.Int("min_size", cfg.MinSize),
 			zap.Int("max_size", cfg.MaxSize),
@@ -115,13 +135,13 @@ func Init(cfg *PoolConfig) error {
 		baseAnalyzer, err := rag.NewAnalyzer(cfg.DictPath)
 		if err != nil {
 			poolInitError = fmt.Errorf("failed to create base analyzer: %w", err)
-			logger.Error("Failed to create base analyzer", poolInitError)
+			common.Error("Failed to create base analyzer", poolInitError)
 			return
 		}
 
 		if err = baseAnalyzer.Load(); err != nil {
 			poolInitError = fmt.Errorf("failed to load base analyzer: %w", err)
-			logger.Error("Failed to load base analyzer", poolInitError)
+			common.Error("Failed to load base analyzer", poolInitError)
 			baseAnalyzer.Close()
 			return
 		}
@@ -133,7 +153,7 @@ func Init(cfg *PoolConfig) error {
 			instance, err := globalPool.createInstance()
 			if err != nil {
 				poolInitError = fmt.Errorf("failed to create instance %d: %w", i, err)
-				logger.Error("Failed to create pool instance", poolInitError)
+				common.Error("Failed to create pool instance", poolInitError)
 				globalPool.Close()
 				return
 			}
@@ -142,7 +162,7 @@ func Init(cfg *PoolConfig) error {
 		}
 
 		globalPool.initialized = true
-		logger.Info("Analyzer pool initialized successfully",
+		common.Info("Analyzer pool initialized successfully",
 			zap.Int("pre_warmed", cfg.MinSize),
 			zap.Int32("current_size", atomic.LoadInt32(&globalPool.currentSize)))
 
@@ -198,7 +218,7 @@ func (p *analyzerPool) acquire() (*poolInstance, error) {
 				atomic.AddInt32(&p.currentSize, -1)
 				return nil, fmt.Errorf("failed to dynamically create instance: %w", err)
 			}
-			logger.Info("Pool expanded dynamically",
+			common.Info("Pool expanded dynamically",
 				zap.Int32("previous_size", current),
 				zap.Int32("new_size", current+1),
 				zap.Int("max_size", p.config.MaxSize))
@@ -237,7 +257,7 @@ func (p *analyzerPool) release(instance *poolInstance) {
 		// Successfully returned to pool
 	default:
 		// Pool is full (shouldn't happen normally), close this instance
-		logger.Warn("Pool full when releasing instance, destroying it",
+		common.Warn("Pool full when releasing instance, destroying it",
 			zap.Int32("current_size", atomic.LoadInt32(&p.currentSize)))
 		instance.analyzer.Close()
 		atomic.AddInt32(&p.currentSize, -1)
@@ -308,7 +328,7 @@ func (p *analyzerPool) shrink() {
 		}
 
 		newSize := atomic.AddInt32(&p.currentSize, -int32(len(toRemove)))
-		logger.Info("Pool shrunk",
+		common.Info("Pool shrunk",
 			zap.Int("removed_instances", len(toRemove)),
 			zap.Int32("previous_size", currentSize),
 			zap.Int32("new_size", newSize),
@@ -348,7 +368,7 @@ func (p *analyzerPool) Close() {
 		p.baseAnalyzer = nil
 	}
 
-	logger.Info(fmt.Sprintf("Analyzer pool closed, final_size: %d", atomic.LoadInt32(&p.currentSize)))
+	common.Info(fmt.Sprintf("Analyzer pool closed, final_size: %d", atomic.LoadInt32(&p.currentSize)))
 }
 
 // GetPoolStats returns current pool statistics
@@ -412,7 +432,7 @@ func withAnalyzerResult[T any](fn func(*rag.Analyzer) (T, error)) (T, error) {
 //
 // NOTE: For Infinity engine, returns input unchanged to match python's behavior
 func Tokenize(text string) (string, error) {
-	if engine.GetEngineType() == "infinity" {
+	if engineTypeProvider() == "infinity" {
 		return text, nil
 	}
 	return withAnalyzerResult(func(a *rag.Analyzer) (string, error) {
@@ -440,7 +460,7 @@ func Analyze(text string) ([]rag.Token, error) {
 func SetFineGrained(fineGrained bool) {
 	// In pool mode, we don't set global state on instances
 	// Each request gets a fresh instance with default settings
-	logger.Debug("SetFineGrained is no-op in pool mode", zap.Bool("fine_grained", fineGrained))
+	common.Debug("SetFineGrained is no-op in pool mode", zap.Bool("fine_grained", fineGrained))
 }
 
 // FineGrainedTokenize performs fine-grained tokenization on space-separated tokens
@@ -449,7 +469,7 @@ func SetFineGrained(fineGrained bool) {
 //
 // NOTE: For Infinity engine, returns input unchanged to match python's behavior
 func FineGrainedTokenize(tokens string) (string, error) {
-	if engine.GetEngineType() == "infinity" {
+	if engineTypeProvider() == "infinity" {
 		return tokens, nil
 	}
 	return withAnalyzerResult(func(a *rag.Analyzer) (string, error) {
@@ -460,7 +480,7 @@ func FineGrainedTokenize(tokens string) (string, error) {
 // SetEnablePosition sets whether to enable position tracking
 // Note: This is a no-op in pool mode as each request uses its own instance
 func SetEnablePosition(enablePosition bool) {
-	logger.Debug("SetEnablePosition is no-op in pool mode", zap.Bool("enable_position", enablePosition))
+	common.Debug("SetEnablePosition is no-op in pool mode", zap.Bool("enable_position", enablePosition))
 }
 
 // IsInitialized checks whether the tokenizer pool has been initialized
@@ -484,4 +504,63 @@ func GetTermTag(term string) string {
 		return a.GetTermTag(term), nil
 	})
 	return result
+}
+
+var cl100kEncoder struct {
+	sync.Once
+	enc *tiktoken.Tiktoken
+	err error
+}
+
+func getCL100KEncoder() (*tiktoken.Tiktoken, error) {
+	cl100kEncoder.Do(func() {
+		cl100kEncoder.enc, cl100kEncoder.err = tiktoken.GetEncoding("cl100k_base")
+	})
+	return cl100kEncoder.enc, cl100kEncoder.err
+}
+
+// NumTokensFromString returns the number of tokens in s using the cl100k_base
+// BPE encoding
+func NumTokensFromString(s string) int {
+	if s == "" {
+		return 0
+	}
+	enc, err := getCL100KEncoder()
+	if err != nil {
+		// Fail closed: avoid dangerous undercounting when encoder is unavailable.
+		// A conservative byte-length estimate errs on the side of over-counting,
+		// which is safer for budget enforcement than returning zero.
+		return len([]byte(s))
+	}
+	return len(enc.Encode(s, nil, nil))
+}
+
+// TrimContentToTokenLimit truncates s to at most limit tokens using the
+// cl100k_base encoder. Mirrors Python's trim_content helper in
+// rag/prompts/generator.py: encoder.decode(encoder.encode(content)[:limit]).
+// Returns the original string if it already fits.
+func TrimContentToTokenLimit(s string, limit int) string {
+	if limit < 0 {
+		limit = 0
+	}
+	enc, err := getCL100KEncoder()
+	if err != nil {
+		// Fail closed: fall back to byte-length trimming with UTF-8 safety.
+		if limit <= 0 {
+			return ""
+		}
+		b := []byte(s)
+		if len(b) <= limit {
+			return s
+		}
+		for limit > 0 && !utf8.Valid(b[:limit]) {
+			limit--
+		}
+		return string(b[:limit])
+	}
+	tokens := enc.Encode(s, nil, nil)
+	if len(tokens) <= limit {
+		return s
+	}
+	return enc.Decode(tokens[:limit])
 }

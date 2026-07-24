@@ -1,12 +1,13 @@
 {
   "name": "Google",
+  "rank": 997,
   "url": {
     "default": "https://generativelanguage.googleapis.com"
   },
   "url_suffix": {
     "models": "v1beta/models"
   },
-  "series": "gemini",
+  "class": "gemini",
   "models": [
     {
       "name": "gemini-2.5-flash",
@@ -18,6 +19,13 @@
         "default_value": true,
         "clear_thinking": true
       }
+    },
+    {
+      "name": "text-embedding-004",
+      "max_tokens": 2048,
+      "model_types": [
+        "embedding"
+      ]
     }
   ],
   "features": {

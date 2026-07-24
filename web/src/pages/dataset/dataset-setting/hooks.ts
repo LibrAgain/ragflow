@@ -1,8 +1,6 @@
-import { LlmModelType } from '@/constants/knowledge';
 import { useSetModalState } from '@/hooks/common-hooks';
 
 import { useFetchKnowledgeBaseConfiguration } from '@/hooks/use-knowledge-request';
-import { useSelectLlmOptionsByModelType } from '@/hooks/use-llm-request';
 import { useSelectParserList } from '@/hooks/use-user-setting-request';
 import { checkEmbedding } from '@/services/knowledge-service';
 import { useIsFetching } from '@tanstack/react-query';
@@ -22,16 +20,11 @@ export function useSelectChunkMethodList() {
   return parserList.filter((x) => !HiddenFields.some((y) => y === x.value));
 }
 
-export function useSelectEmbeddingModelOptions() {
-  const allOptions = useSelectLlmOptionsByModelType();
-  return allOptions[LlmModelType.Embedding];
-}
-
 export function useHasParsedDocument(isEdit?: boolean) {
   const { data: knowledgeDetails } = useFetchKnowledgeBaseConfiguration({
     isEdit,
   });
-  return knowledgeDetails.chunk_num > 0;
+  return knowledgeDetails.chunk_count > 0;
 }
 
 export const useFetchKnowledgeConfigurationOnMount = (
@@ -47,6 +40,8 @@ export const useFetchKnowledgeConfigurationOnMount = (
       raptor: {
         ...form.formState?.defaultValues?.parser_config?.raptor,
         ...knowledgeDetails.parser_config?.raptor,
+        clustering_method:
+          knowledgeDetails.parser_config?.raptor?.ext?.clustering_method,
         use_raptor: true,
       },
       graphrag: {
@@ -66,8 +61,8 @@ export const useFetchKnowledgeConfigurationOnMount = (
         'pagerank',
         'avatar',
       ]),
-      embedding_model: knowledgeDetails.embd_id,
-      chunk_method: knowledgeDetails.parser_id,
+      embedding_model: knowledgeDetails.embedding_model,
+      chunk_method: knowledgeDetails.chunk_method,
     } as z.infer<typeof formSchema>;
     form.reset(formValues);
   }, [form, knowledgeDetails]);
