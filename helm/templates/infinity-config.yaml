@@ -1,0 +1,12 @@
+{{- if and (eq .Values.env.DOC_ENGINE "infinity") .Values.infinity.customConfig -}}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "ragflow.fullname" . }}-infinity-config
+  labels:
+    {{- include "ragflow.labels" . | nindent 4 }}
+    app.kubernetes.io/component: infinity
+data:
+  infinity_conf.toml: |
+    {{- .Values.infinity.customConfig | nindent 4 }}
+{{- end -}}

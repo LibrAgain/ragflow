@@ -19,7 +19,6 @@ from datetime import datetime
 from api.apps import login_required
 from api.db.services.task_service import TaskService, CANVAS_DEBUG_DOC_ID, GRAPH_RAPTOR_FAKE_DOC_ID
 from api.utils.api_utils import (
-    get_data_error_result,
     get_json_result,
     get_request_json,
     validate_request,
@@ -31,8 +30,7 @@ from rag.utils.redis_conn import REDIS_CONN
 @manager.route("/tasks/<task_id>/cancel", methods=["POST"])  # noqa: F821
 @login_required
 async def cancel_task(task_id):
-    """Cancel a running task.
-    """
+    """Cancel a running task."""
     return await _cancel_task(task_id)
 
 
@@ -57,25 +55,6 @@ async def _cancel_task(task_id):
     Sets a Redis cancel flag, updates the task progress to -1 (cancelled),
         and marks the associated document's run status as CANCEL if applicable.
     """
-    exists, task = TaskService.get_by_id(task_id)
-    if not exists:
-        return get_data_error_result(
-            code=RetCode.NOT_FOUND,
-            message=f"Task '{task_id}' not found.",
-        )
-
-    # A task is stoppable if it hasn't completed (progress < 1) and isn't already
-    # in a failed/cancelled state (progress >= 0).  progress == -1 means the task
-    # previously failed or was cancelled.
-    if task.progress < 0:
-        return get_data_error_result(
-            message="Task is already in a cancelled or failed state.",
-        )
-    if task.progress >= 1:
-        return get_data_error_result(
-            message="Task has already completed and cannot be stopped.",
-        )
-
     try:
         REDIS_CONN.set(f"{task_id}-cancel", "x")
     except Exception as e:
@@ -85,6 +64,10 @@ async def _cancel_task(task_id):
             message="Failed to stop task",
         )
 
+    exists, task = TaskService.get_by_id(task_id)
+    if not exists:
+        return get_json_result(data=True)
+
     # Append a cancellation message so the user can see it in progress_msg.
     try:
         cancel_msg = f"\n{datetime.now().strftime('%H:%M:%S')} Task stopped by user."
@@ -93,11 +76,7 @@ async def _cancel_task(task_id):
         TaskService.model.update(
             progress_msg=TaskService.model.progress_msg + cancel_msg,
             progress=-1,
-        ).where(
-            (TaskService.model.id == task_id)
-            & (TaskService.model.progress >= 0)
-            & (TaskService.model.progress < 1)
-        ).execute()
+        ).where((TaskService.model.id == task_id) & (TaskService.model.progress >= 0) & (TaskService.model.progress < 1)).execute()
     except Exception as e:
         logging.warning("Failed to update task %s progress after cancellation: %s", task_id, str(e))
 
@@ -105,11 +84,17 @@ async def _cancel_task(task_id):
     # cancelled so that the UI reflects the state correctly.
     try:
         from api.db.services.document_service import DocumentService
+
         doc_id = task.doc_id
         if doc_id and doc_id not in (CANVAS_DEBUG_DOC_ID, GRAPH_RAPTOR_FAKE_DOC_ID):
             _, doc = DocumentService.get_by_id(doc_id)
             if doc and str(doc.run) in (TaskStatus.RUNNING.value, TaskStatus.SCHEDULE.value):
-                DocumentService.update_by_id(doc_id, {"run": TaskStatus.CANCEL.value, "progress": 0})
+                cancel_doc_msg = f"\n{datetime.now().strftime('%H:%M:%S')} Task stopped by user."
+                DocumentService.update_by_id(
+                    doc_id,
+                    {"run": TaskStatus.CANCEL.value, "progress": 0, "progress_msg": (doc.progress_msg or "") + cancel_doc_msg},
+                )
+                logging.debug("Appended cancellation marker to progress_msg on task cancel: task_id=%s doc_id=%s", task_id, doc_id)
     except Exception as e:
         logging.warning("Failed to update document run status for task %s: %s", task_id, str(e))
 

@@ -83,7 +83,7 @@ env:
 ragflow:
   image:
     repository: infiniflow/ragflow
-    tag: v0.25.0
+    tag: v0.26.4
     pullPolicy: IfNotPresent
     pullSecrets: []
   # Optional service configuration overrides
@@ -130,9 +130,13 @@ ragflow:
 infinity:
   image:
     repository: infiniflow/infinity
-    tag: v0.7.0-dev5
+    tag: v0.7.0
     pullPolicy: IfNotPresent
     pullSecrets: []
+  # Full content of infinity_conf.toml. When set, it is mounted at
+  # /infinity_conf.toml and infinity is started with `-f /infinity_conf.toml`.
+  # When empty (default), infinity runs with its built-in defaults.
+  customConfig: ""
   storage:
     className:
     capacity: 5Gi
@@ -199,8 +203,8 @@ opensearch:
 minio:
   enabled: true
   image:
-    repository: quay.io/minio/minio
-    tag: RELEASE.2023-12-20T01-00-02Z
+    repository: pgsty/minio
+    tag: RELEASE.2026-03-25T00-00-00Z
     pullPolicy: IfNotPresent
     pullSecrets: []
   storage:

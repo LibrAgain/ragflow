@@ -42,6 +42,9 @@ spec:
         app.kubernetes.io/component: infinity
       annotations:
         checksum/config: {{ include (print $.Template.BasePath "/env.yaml") . | sha256sum }}
+        {{- if .Values.infinity.customConfig }}
+        checksum/infinity-config: {{ include (print $.Template.BasePath "/infinity-config.yaml") . | sha256sum }}
+        {{- end }}
     spec:
       {{- if or .Values.global.imagePullSecrets .Values.infinity.image.pullSecrets }}
       imagePullSecrets:
@@ -58,6 +61,9 @@ spec:
         {{- with .Values.infinity.image.pullPolicy }}
         imagePullPolicy: {{ . }}
         {{- end }}
+        {{- if .Values.infinity.customConfig }}
+        args: ["-f", "/infinity_conf.toml"]
+        {{- end }}
         envFrom:
           - secretRef:
               name: {{ include "ragflow.fullname" . }}-env-config
@@ -71,6 +77,11 @@ spec:
         volumeMounts:
           - mountPath: /var/infinity
             name: infinity-data
+          {{- if .Values.infinity.customConfig }}
+          - mountPath: /infinity_conf.toml
+            subPath: infinity_conf.toml
+            name: infinity-config
+          {{- end }}
         {{- with .Values.infinity.deployment.resources }}
         resources:
           {{- . | toYaml | nindent 10 }}
@@ -93,6 +104,11 @@ spec:
         - name: infinity-data
           persistentVolumeClaim:
             claimName: {{ include "ragflow.fullname" . }}-infinity
+        {{- if .Values.infinity.customConfig }}
+        - name: infinity-config
+          configMap:
+            name: {{ include "ragflow.fullname" . }}-infinity-config
+        {{- end }}
 ---
 apiVersion: v1
 kind: Service

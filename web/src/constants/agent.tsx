@@ -1,3 +1,4 @@
+import React from 'react';
 import { setInitialChatVariableEnabledFieldValue } from '@/utils/chat';
 import {
   Circle,
@@ -108,7 +109,10 @@ export enum Operator {
   UserFillUp = 'UserFillUp',
   StringTransform = 'StringTransform',
   SearXNG = 'SearXNG',
+  BGPT = 'BGPT',
+  KeenableSearch = 'KeenableSearch',
   DocGenerator = 'DocGenerator',
+  Browser = 'Browser',
   Placeholder = 'Placeholder',
   DataOperations = 'DataOperations',
   ListOperations = 'ListOperations',
