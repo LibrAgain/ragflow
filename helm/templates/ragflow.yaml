@@ -41,9 +41,14 @@ spec:
         {{- with .Values.ragflow.image.pullPolicy }}
         imagePullPolicy: {{ . }}
         {{- end }}
-        {{- if .Values.ragflow.admin.enabled }}
+        {{- if or .Values.ragflow.admin.enabled .Values.ragflow.deployment.extraArgs }}
         args:
+          {{- if .Values.ragflow.admin.enabled }}
           - "--enable-adminserver"
+          {{- end }}
+          {{- range .Values.ragflow.deployment.extraArgs }}
+          - {{ . | quote }}
+          {{- end }}
         {{- end }}
         ports:
           - containerPort: 80

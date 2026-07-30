@@ -120,6 +120,12 @@ ragflow:
   deployment:
     strategy:
     resources:
+    # Extra entrypoint flags appended to the built-in args, e.g.
+    # ["--disable-datasync"]. Some services started by docker/entrypoint.sh can
+    # ONLY be turned off this way: their ENABLE_* variables are assigned
+    # unconditionally in the script, so an environment variable is overwritten
+    # before it is ever read. See `entrypoint.sh --help` for the full list.
+    extraArgs: []
   service:
     # Use LoadBalancer to expose the web interface externally
     type: ClusterIP
