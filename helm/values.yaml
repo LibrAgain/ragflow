@@ -229,6 +229,9 @@ mysql:
   deployment:
     strategy:
     resources:
+    # Extra mysqld command-line flags appended to the built-in args,
+    # e.g. ["--max-allowed-packet=268435456"]
+    extraArgs: []
   service:
     type: ClusterIP
 

@@ -71,6 +71,9 @@ spec:
           - --tls_version=TLSv1.2,TLSv1.3
           - --init-file=/data/application/init.sql
           - --disable-log-bin
+          {{- range .Values.mysql.deployment.extraArgs }}
+          - {{ . | quote }}
+          {{- end }}
         ports:
           - containerPort: 3306
             name: mysql
