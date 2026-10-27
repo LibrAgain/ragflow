@@ -63,6 +63,10 @@ spec:
         envFrom:
           - secretRef:
               name: {{ include "ragflow.fullname" . }}-env-config
+        {{- with include "ragflow.existingSecret" . }}
+          - secretRef:
+              name: {{ . }}
+        {{- end }}
         args:
           - --max_connections=1000
           - --character-set-server=utf8mb4

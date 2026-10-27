@@ -84,6 +84,10 @@ spec:
         envFrom:
           - secretRef:
               name: {{ include "ragflow.fullname" . }}-env-config
+        {{- with include "ragflow.existingSecret" . }}
+          - secretRef:
+              name: {{ . }}
+        {{- end }}
           - configMapRef:
               name: {{ include "ragflow.fullname" . }}-es-config
         ports:

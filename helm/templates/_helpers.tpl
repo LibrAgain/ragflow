@@ -85,3 +85,11 @@ Create the name of the service account to use
 {{- default "default" .Values.serviceAccount.name }}
 {{- end }}
 {{- end }}
+
+{{/*
+Name of the existing Secret holding the passwords (secrets.existingSecret), or "".
+Optional key: absent from values.yaml so that existing releases keep the same checksum.
+*/}}
+{{- define "ragflow.existingSecret" -}}
+{{- dig "existingSecret" "" (.Values.secrets | default dict) -}}
+{{- end -}}

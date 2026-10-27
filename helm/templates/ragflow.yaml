@@ -77,6 +77,10 @@ spec:
         envFrom:
           - secretRef:
               name: {{ include "ragflow.fullname" . }}-env-config
+        {{- with include "ragflow.existingSecret" . }}
+          - secretRef:
+              name: {{ . }}
+        {{- end }}
         {{- with .Values.ragflow.deployment.resources }}
         resources:
           {{- . | toYaml | nindent 10 }}
